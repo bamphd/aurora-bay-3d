@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AURORA BAY — open-world crime in Aurora Bay</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #eef1f5; }
+  .panel { background: rgba(10, 12, 18, 0.72); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; padding: 10px 12px; }
+  /* Top-left: wanted, vitals, money, rank. */
+  #topleft { position: absolute; top: 12px; left: 12px; width: 300px; }
+  .stars { font-size: 26px; letter-spacing: 3px; color: #f2c94c; line-height: 1; }
+  .stars.hot { color: #ff5340; }
+  .bar { height: 9px; background: #262b36; border-radius: 5px; overflow: hidden; margin-top: 6px; }
+  .bar > div { height: 100%; border-radius: 5px; }
+  #health-fill { background: linear-gradient(90deg, #37d67a, #7be495); width: 100%; }
+  #armor-fill { background: linear-gradient(90deg, #4f8ef7, #7fb0ff); width: 0%; }
+  .barlabel { font-size: 11px; color: #9aa3b2; margin-top: 2px; }
+  #money { font-size: 27px; font-weight: 800; color: #7be495; margin-top: 6px; }
+  #rankrep { font-size: 13px; color: #f2c94c; }
+  /* Top-centre: mission banner + police alerts. */
+  #topcenter { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 520px; text-align: center; }
+  #mission-banner { font-size: 19px; font-weight: 800; background: rgba(10, 12, 18, 0.78); border: 1px solid rgba(242, 201, 76, 0.55); border-radius: 10px; padding: 9px 12px; }
+  #alerts { margin-top: 20px; font-size: 15px; font-weight: 700; color: #ff6a55; text-shadow: 0 1px 3px #000; white-space: pre-line; line-height: 1.35; }
+  /* Top-right: clock, district, radio. */
+  #topright { position: absolute; top: 12px; right: 12px; width: 250px; text-align: right; }
+  #clock { font-size: 30px; font-weight: 800; }
+  #district { font-size: 15px; font-weight: 800; color: #f2c94c; }
+  #radio { font-size: 12px; color: #c8d0dc; }
+  /* Bottom-left: minimap + district standing. */
+  #bottomleft { position: absolute; left: 12px; bottom: 12px; width: 252px; }
+  #minimap { width: 232px; height: 150px; display: block; border: 2px solid rgba(242, 201, 76, 0.7); border-radius: 8px; background: #10131a; }
+  .stand-row { display: flex; align-items: center; gap: 6px; font-size: 10px; margin-top: 2px; }
+  .stand-row span { width: 74px; color: #c8d0dc; }
+  .stand-bar { flex: 1; height: 6px; background: #262b36; border-radius: 3px; overflow: hidden; }
+  .stand-bar > div { height: 100%; background: #f2c94c; }
+  .stand-row b { width: 30px; text-align: right; color: #f2c94c; }
+  /* Bottom-right: speed + weapon. */
+  #bottomright { position: absolute; right: 12px; bottom: 12px; text-align: right; }
+  #speed { font-size: 36px; font-weight: 800; }
+  #weapon { font-size: 15px; font-weight: 700; color: #f2c94c; }
+  #ammo { font-size: 12px; color: #c8d0dc; }
+  /* Bottom-centre: controls hint. */
+  #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #d6dce6; background: rgba(10, 12, 18, 0.6); border-radius: 8px; padding: 6px 10px; white-space: nowrap; }
+  /* Weapon wheel. */
+  #wheel { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); display: none; gap: 10px; }
+  .wheel-slot { width: 128px; background: rgba(10, 12, 18, 0.82); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 10px; text-align: center; overflow: hidden; }
+  .wheel-slot.cur { border-color: #f2c94c; box-shadow: 0 0 0 2px #f2c94c; }
+  .wheel-slot.locked { opacity: 0.45; }
+  .wheel-slot b { display: block; font-size: 22px; color: #f2c94c; }
+  .wheel-slot span { display: block; font-size: 13px; font-weight: 700; }
+  .wheel-slot em { display: block; font-size: 11px; color: #9aa3b2; font-style: normal; }
+  /* Garage panel. */
+  #garage-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 520px; display: none; background: rgba(10, 12, 18, 0.92); border: 1px solid rgba(242, 201, 76, 0.6); border-radius: 12px; padding: 16px; }
+  #garage-panel h2 { margin: 0 0 4px; font-size: 22px; color: #f2c94c; }
+  #garage-panel p { margin: 0 0 10px; font-size: 13px; color: #c8d0dc; }
+  #garage-panel .row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  /* Title / pause / game-over overlays. */
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(8, 10, 16, 0.55); text-align: center; }
+  .overlay h1 { font-size: 64px; margin: 0; color: #f2c94c; text-shadow: 0 3px 18px #000; letter-spacing: 2px; }
+  .overlay h2 { font-size: 20px; margin: 8px 0 0; color: #fff; font-weight: 600; }
+  .overlay p { font-size: 15px; color: #d6dce6; max-width: 640px; line-height: 1.5; }
+  .overlay .keys { font-size: 13px; color: #f2c94c; }
+  #toast { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 800; color: #7be495; text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity 0.3s; }
+</style>
+<script src="./vendor/three.min.js"></script>
+</head>
+<body>
+<canvas id="game" aria-label="Aurora Bay: open-world crime game. Drive, walk, steal cars, run missions, lose the cops."></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<div id="hud">
+  <div id="topleft" class="panel">
+    <div id="stars" class="stars">☆☆☆☆☆</div>
+    <div class="bar"><div id="health-fill"></div></div>
+    <div class="barlabel">HP <span id="hp-num">100</span> · ARMOR <span id="armor-num">0</span></div>
+    <div class="bar"><div id="armor-fill"></div></div>
+    <div id="money">$500</div>
+    <div id="rankrep">Nobody · 0 REP</div>
+  </div>
+  <div id="topcenter">
+    <div id="mission-banner">MISSION 1: FIRST LIGHT</div>
+    <div id="alerts"></div>
+  </div>
+  <div id="topright" class="panel">
+    <div id="clock">17:42</div>
+    <div id="district">MARINA DISTRICT</div>
+    <div id="radio">AURORA FM 91.7</div>
+  </div>
+  <div id="bottomleft" class="panel">
+    <canvas id="minimap" width="232" height="150"></canvas>
+    <div id="standing"></div>
+  </div>
+  <div id="bottomright" class="panel">
+    <div id="speed">0 km/h</div>
+    <div id="weapon">P9 Pistol</div>
+    <div id="ammo">AMMO 120 · [1-6] weapon · [Q] wheel</div>
+  </div>
+  <div id="hint">WASD drive / walk · E steal car · Click shoot · 1-6 weapons · Q wheel · M mission · R race · T taxi · G garage · X driver · C hacker · B buy weapon · Esc pause</div>
+  <div id="wheel"></div>
+  <div id="garage-panel"></div>
+  <div id="toast"></div>
+  <div id="title-screen" class="overlay">
+    <h1>AURORA BAY</h1>
+    <h2>Open-world crime in Aurora Bay — 10 story missions, ABPD dispatch, KESTREL-1 air support</h2>
+    <p>Play ROOK, a hustler with a fast car and a faster crew. Steal cars, run missions, outrun the ABPD, build your rep from Nobody to Legend of Aurora — across 6 districts, from the Harbor to the Marina, over the bridge at golden hour.</p>
+    <p class="keys">WASD drive / walk · E steal car · Click shoot · Q weapon wheel · M mission · R race · T taxi · G garage · C VESPER hack · X BRICK boost · Esc pause</p>
+    <p>Press Space or click to start</p>
+  </div>
+  <div id="pause-screen" class="overlay" style="display:none">
+    <h1>PAUSED</h1>
+    <p>Press P or Esc to keep playing.</p>
+  </div>
+  <div id="over-screen" class="overlay" style="display:none">
+    <h1>BUSTED</h1>
+    <p id="over-text">The ABPD got you. Aurora Bay keeps your money — your rep stays.</p>
+    <p>Press Space to play again</p>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
